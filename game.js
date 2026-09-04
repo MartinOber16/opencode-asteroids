@@ -216,7 +216,8 @@ class Ship {
     this.thrusting     = false;
     this.invincible    = 3;
     this.speedBoostTime = 0;
-    this.shieldTime     = 0;
+this.shieldTime     = 0;
+    this.tripleShotTime = 0;
     this.shootCooldown = 0;
     this.dead          = false;
   }
@@ -225,7 +226,8 @@ class Ship {
     if (this.dead) return;
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.speedBoostTime > 0) this.speedBoostTime -= dt;
-    if (this.shieldTime    > 0) this.shieldTime    -= dt;
+if (this.shieldTime    > 0) this.shieldTime    -= dt;
+    if (this.tripleShotTime > 0) this.tripleShotTime -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
 
     const ROT   = 3.5;   // rad/s
@@ -254,6 +256,15 @@ class Ship {
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
+
+    if (this.tripleShotTime > 0) {
+      const SPREAD = 0.26;
+      return [
+        new Bullet(ox, oy, this.angle - SPREAD),
+        new Bullet(ox, oy, this.angle),
+        new Bullet(ox, oy, this.angle + SPREAD),
+      ];
+    }
     return [new Bullet(ox, oy, this.angle)];
   }
 
@@ -375,17 +386,20 @@ class PowerUp {
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
 
-    if (this.type === 'shield') {
-      ctx.strokeStyle = '#4fb3ff';
-      ctx.lineWidth = 2;
-      ctx.lineJoin = 'round';
-      ctx.fillStyle = 'rgba(79,179,255,0.15)';
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+    const color = this.type === 'shield' ? '#4fb3ff' : this.type === 'triple' ? '#0f0' : '#0ff';
+    const fill  = this.type === 'shield' ? 'rgba(79,179,255,0.15)' : this.type === 'triple' ? 'rgba(0,255,0,0.15)' : 'rgba(0,255,255,0.15)';
 
-      ctx.fillStyle = '#4fb3ff';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    if (this.type === 'shield') {
       ctx.beginPath();
       ctx.moveTo(0, -8);
       ctx.lineTo(7, -5);
@@ -395,17 +409,22 @@ class PowerUp {
       ctx.lineTo(-7, -5);
       ctx.closePath();
       ctx.fill();
-    } else {
-      ctx.strokeStyle = '#0ff';
-      ctx.lineWidth = 2;
-      ctx.lineJoin = 'round';
-      ctx.fillStyle = 'rgba(0,255,255,0.15)';
+    } else if (this.type === 'triple') {
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.moveTo(8, 0);
+      ctx.lineTo(2, -3);
+      ctx.lineTo(4, 0);
+      ctx.lineTo(2, 3);
+      ctx.closePath();
       ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#0ff';
+      ctx.beginPath();
+      ctx.moveTo(3, 0);
+      ctx.lineTo(-3, -3);
+      ctx.lineTo(-1, 0);
+      ctx.lineTo(-3, 3);
+      ctx.closePath();
+      ctx.fill();
+    } else {
       ctx.beginPath();
       ctx.moveTo(7, 0);
       ctx.lineTo(-5, -6);
@@ -526,7 +545,8 @@ function update(dt) {
   powerUpTimer -= dt;
   if (powerUpTimer <= 0) {
     if (powerUps.length < 2) {
-      const type = Math.random() < 0.5 ? 'speed' : 'shield';
+const r = Math.random();
+      const type = r < 1 / 3 ? 'speed' : r < 2 / 3 ? 'shield' : 'triple';
       powerUps.push(new PowerUp(rand(40, W - 40), rand(40, H - 40), type));
     }
     powerUpTimer = 10;
@@ -609,7 +629,9 @@ function update(dt) {
     if (dist(ship, pu) < ship.radius + pu.radius) {
       pu.dead = true;
       if (pu.type === 'speed') ship.speedBoostTime = 5;
+if (pu.type === 'speed') ship.speedBoostTime = 5;
       else if (pu.type === 'shield') ship.shieldTime = SHIELD_TIME;
+      else if (pu.type === 'triple') ship.tripleShotTime = 5;
       break;
     }
   }
@@ -649,7 +671,7 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
-ctx.textAlign = 'left';
+  ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font      = '12px monospace';
   ctx.fillText(`SKIN: ${SKINS[skinIndex].name}   [C]`, 14, H - 14);
@@ -665,7 +687,13 @@ ctx.textAlign = 'left';
     ctx.fillStyle = '#0ff';
     ctx.font = 'bold 16px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`¡VELOCIDAD! ${Math.ceil(ship.speedBoostTime)}s`, W / 2, H - 20);
+    ctx.fillText(`¡VELOCIDAD! ${Math.ceil(ship.speedBoostTime)}s`, W / 2, H - 60);
+  }
+  if (ship.tripleShotTime > 0) {
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`¡TRIPLE DISPARO! ${Math.ceil(ship.tripleShotTime)}s`, W / 2, H - 20);
   }
 }
 
