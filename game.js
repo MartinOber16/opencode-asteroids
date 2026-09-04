@@ -12,7 +12,7 @@ const justPressed = {};
 window.addEventListener('keydown', e => {
   justPressed[e.code] = !keys[e.code];
   keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code))
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyC'].includes(e.code))
     e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -177,6 +177,29 @@ class ShootingStar {
   }
 }
 
+// ── Skins ─────────────────────────────────────────────────────────────────────
+const SKINS = [
+  { name: 'Clásica',   stroke: '#fff',            fill: 'rgba(255,255,255,0.06)',  glow: null,    lineWidth: 1.5, flame: 'rgba(255, 130, 0, 0.85)' },
+  { name: 'Neón',      stroke: '#0ff',            fill: 'rgba(0,255,255,0.06)',    glow: '#0ff',   lineWidth: 1.8, flame: 'rgba(0, 255, 255, 0.9)' },
+  { name: 'Fénix',     stroke: '#ff7b2b',         fill: 'rgba(255,123,43,0.06)',   glow: '#ff2d2d', lineWidth: 1.8, flame: 'rgba(255, 110, 20, 0.9)' },
+  { name: 'Esmeralda', stroke: '#3ff05c',         fill: 'rgba(63,240,92,0.06)',    glow: '#12c94a', lineWidth: 1.8, flame: 'rgba(63, 240, 92, 0.9)' },
+  { name: 'Espectro',  stroke: '#c683ff',         fill: 'rgba(198,131,255,0.06)',  glow: '#9a4dff', lineWidth: 1.8, flame: 'rgba(198, 131, 255, 0.9)' },
+];
+const SKIN_STORAGE_KEY = 'asteroids_skin';
+let skinIndex = 0;
+
+function loadSkin() {
+  try {
+    const saved = parseInt(localStorage.getItem(SKIN_STORAGE_KEY), 10);
+    if (Number.isInteger(saved) && saved >= 0 && saved < SKINS.length) skinIndex = saved;
+  } catch (e) { /* almacenamiento no disponible */ }
+}
+
+function setSkin(i) {
+  skinIndex = ((i % SKINS.length) + SKINS.length) % SKINS.length;
+  try { localStorage.setItem(SKIN_STORAGE_KEY, String(skinIndex)); } catch (e) { /* no disponible */ }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -235,12 +258,11 @@ class Ship {
     // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
+    const skin = SKINS[skinIndex];
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth   = 1.5;
-    ctx.lineJoin    = 'round';
+    ctx.lineJoin = 'round';
 
     // Silueta clásica: triángulo con muesca trasera
     ctx.beginPath();
@@ -249,7 +271,16 @@ class Ship {
     ctx.lineTo( -7,  0);   // muesca trasera
     ctx.lineTo(-12,  9);   // ala derecha
     ctx.closePath();
+    ctx.fillStyle = skin.fill;
+    ctx.fill();
+    ctx.strokeStyle = skin.stroke;
+    ctx.lineWidth   = skin.lineWidth;
+    if (skin.glow) {
+      ctx.shadowColor = skin.glow;
+      ctx.shadowBlur  = 10;
+    }
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
@@ -257,7 +288,7 @@ class Ship {
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = skin.flame;
       ctx.stroke();
     }
 
@@ -421,6 +452,8 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (pressed('KeyC')) setSkin(skinIndex + 1);
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -536,8 +569,8 @@ function drawLifeIcon(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth   = 1.2;
+  ctx.strokeStyle = SKINS[skinIndex].stroke;
+  ctx.lineWidth   = 1.4;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
   ctx.moveTo( 9,  0);
@@ -561,6 +594,11 @@ function drawHUD() {
 
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font      = '12px monospace';
+  ctx.fillText(`SKIN: ${SKINS[skinIndex].name}   [C]`, 14, H - 14);
 
   if (ship.speedBoostTime > 0) {
     ctx.fillStyle = '#0ff';
@@ -608,5 +646,6 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
+loadSkin();
 initGame();
 requestAnimationFrame(loop);
