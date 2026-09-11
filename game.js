@@ -12,7 +12,7 @@ const justPressed = {};
 window.addEventListener('keydown', e => {
   justPressed[e.code] = !keys[e.code];
   keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyC'].includes(e.code))
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyC', 'KeyV'].includes(e.code))
     e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -202,6 +202,32 @@ function setSkin(i) {
   try { localStorage.setItem(SKIN_STORAGE_KEY, String(skinIndex)); } catch (e) { /* no disponible */ }
 }
 
+// ── Naves ─────────────────────────────────────────────────────────────────────
+const SHIPS = [
+  { name: 'Clásica', scale: 1, scoreMultiplier: 1 },
+  { name: 'Morada',  scale: 2, scoreMultiplier: 2,
+    stroke: '#b46bff', fill: 'rgba(180,107,255,0.08)', glow: '#8e2dff', lineWidth: 1.6, flame: 'rgba(180,107,255,0.9)' },
+];
+const SHIP_STORAGE_KEY = 'asteroids_ship';
+let shipIndex = 0;
+
+function loadShip() {
+  try {
+    const saved = parseInt(localStorage.getItem(SHIP_STORAGE_KEY), 10);
+    if (Number.isInteger(saved) && saved >= 0 && saved < SHIPS.length) shipIndex = saved;
+  } catch (e) { /* almacenamiento no disponible */ }
+}
+
+function setShip(i) {
+  shipIndex = ((i % SHIPS.length) + SHIPS.length) % SHIPS.length;
+  try { localStorage.setItem(SHIP_STORAGE_KEY, String(shipIndex)); } catch (e) { /* no disponible */ }
+  if (ship) {
+    const def = SHIPS[shipIndex];
+    ship.scale  = def.scale;
+    ship.radius = 12 * def.scale;
+  }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -212,7 +238,8 @@ class Ship {
     this.angle  = -Math.PI / 2;
     this.vx     = 0;
     this.vy     = 0;
-    this.radius = 12;
+    this.scale  = SHIPS[shipIndex].scale;
+    this.radius = 12 * this.scale;
     this.thrusting     = false;
     this.invincible    = 3;
     this.speedBoostTime = 0;
@@ -253,7 +280,7 @@ if (this.shieldTime    > 0) this.shieldTime    -= dt;
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
+    const NOSE = 21 * this.scale;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
 
@@ -274,9 +301,17 @@ if (this.shieldTime    > 0) this.shieldTime    -= dt;
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
     const skin = SKINS[skinIndex];
+    const shipDef = SHIPS[shipIndex];
+    const stroke = shipDef.stroke || skin.stroke;
+    const fill   = shipDef.fill   || skin.fill;
+    const glow   = shipDef.glow   || skin.glow;
+    const lineWidth = shipDef.lineWidth || skin.lineWidth;
+    const flame  = shipDef.flame  || skin.flame;
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
+    ctx.scale(this.scale, this.scale);
     ctx.lineJoin = 'round';
 
     // Silueta clásica: triángulo con muesca trasera
@@ -286,12 +321,12 @@ if (this.shieldTime    > 0) this.shieldTime    -= dt;
     ctx.lineTo( -7,  0);   // muesca trasera
     ctx.lineTo(-12,  9);   // ala derecha
     ctx.closePath();
-    ctx.fillStyle = skin.fill;
+    ctx.fillStyle = fill;
     ctx.fill();
-    ctx.strokeStyle = skin.stroke;
-    ctx.lineWidth   = skin.lineWidth;
-    if (skin.glow) {
-      ctx.shadowColor = skin.glow;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth   = lineWidth / this.scale;
+    if (glow) {
+      ctx.shadowColor = glow;
       ctx.shadowBlur  = 10;
     }
     ctx.stroke();
@@ -303,7 +338,7 @@ if (this.shieldTime    > 0) this.shieldTime    -= dt;
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = skin.flame;
+      ctx.strokeStyle = flame;
       ctx.stroke();
     }
 
@@ -509,9 +544,14 @@ function killShip() {
   }
 }
 
+function addScore(n) {
+  score += n * (SHIPS[shipIndex].scoreMultiplier || 1);
+}
+
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
   if (pressed('KeyC')) setSkin(skinIndex + 1);
+  if (pressed('KeyV')) setShip(shipIndex + 1);
 
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
@@ -571,7 +611,7 @@ const r = Math.random();
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += POINTS[a.size];
+        addScore(POINTS[a.size]);
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
       }
@@ -585,7 +625,7 @@ const r = Math.random();
       if (!ss.dead && !b.dead && dist(b, ss) < ss.radius) {
         b.dead = true;
         ss.dead = true;
-        score += SHOOTING_STAR_POINTS;
+        addScore(SHOOTING_STAR_POINTS);
         explode(ss.x, ss.y, 12);
       }
     }
@@ -598,7 +638,7 @@ const r = Math.random();
     if (dist(ship, a) < ship.radius + a.radius * 0.82) {
       if (ship.shieldTime > 0) {
         a.dead = true;
-        score += POINTS[a.size];
+        addScore(POINTS[a.size]);
         explode(a.x, a.y, a.size * 5);
         newShipAsteroids.push(...a.split());
       } else if (ship.invincible <= 0) {
@@ -614,7 +654,7 @@ const r = Math.random();
     if (dist(ship, ss) < ship.radius + ss.radius) {
       if (ship.shieldTime > 0) {
         ss.dead = true;
-        score += SHOOTING_STAR_POINTS;
+        addScore(SHOOTING_STAR_POINTS);
         explode(ss.x, ss.y, 12);
       } else if (ship.invincible <= 0) {
         killShip();
@@ -645,7 +685,8 @@ function drawLifeIcon(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = SKINS[skinIndex].stroke;
+  const shipDef = SHIPS[shipIndex];
+  ctx.strokeStyle = shipDef.stroke || SKINS[skinIndex].stroke;
   ctx.lineWidth   = 1.4;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
@@ -674,6 +715,10 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font      = '12px monospace';
+  const shipDef = SHIPS[shipIndex];
+  const shipTag = shipDef.scoreMultiplier > 1 ? ` (PUNTOS x${shipDef.scoreMultiplier})` : '';
+  ctx.fillText(`NAVE: ${shipDef.name}${shipTag}   [V]`, 14, H - 30);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
   ctx.fillText(`SKIN: ${SKINS[skinIndex].name}   [C]`, 14, H - 14);
 
   if (ship.shieldTime > 0) {
@@ -736,5 +781,6 @@ function loop(ts) {
 }
 
 loadSkin();
+loadShip();
 initGame();
 requestAnimationFrame(loop);
