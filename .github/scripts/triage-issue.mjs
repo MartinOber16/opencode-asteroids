@@ -241,32 +241,25 @@ function cleanLabels(labels, tipo) {
 }
 
 function buildBody({ body, classification, labels, meta }) {
-  const { tipo, descripcion, reproducir, esperado, navegador } = classification;
+  const { tipo, reproducir, esperado, navegador } = classification;
   const tituloTipo = TIPO_TITULO[tipo] || "—";
   const original = body.trim() || "*El autor no escribió contenido.*";
   const { author, createdAt, git } = meta;
   return [
-    `> *Issue formateado automáticamente por el bot de triage. El contenido original está intacto en el bloque al final.*`,
+    `> *Issue formateado automáticamente por el bot de triage. El texto de "Descripción" es el que ingresó el autor, sin modificar.*`,
     ``,
     `## Tipo`,
     `- **${tituloTipo}** (${tipo})`,
     labels.length ? `- **Labels:** ${labels.map((l) => `\`${l}\``).join(", ")}` : "",
     ``,
     `## Descripción`,
-    descripcion.trim() || "—",
+    original,
     ``,
     `## Cómo reproducir`,
     reproducir.trim() || "—",
     ``,
     `## Comportamiento esperado`,
     esperado.trim() || "—",
-    ``,
-    `<details>`,
-    `<summary>Contenido original del reporte (tal cual lo escribió el autor)</summary>`,
-    ``,
-    original,
-    ``,
-    `</details>`,
     ``,
     `## Información de revisión`,
     ``,
